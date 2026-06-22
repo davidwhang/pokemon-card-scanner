@@ -48,8 +48,9 @@ def analyze_card_image(image_base64):
                             "text": """Analyze this Pokemon trading card image and extract the following information in JSON format:
 {
     "card_name": "the pokemon name",
-    "set_name": "the set this card is from (e.g., Base Set, EX Era, Promo, etc.)",
-    "variant": "any special variant like Holo, Shadowless, ex, VMAX, etc.",
+    "card_number": "the card number if visible (e.g., 123/102), or null if not visible",
+    "set_name": "the set this card is from (e.g., Base Set, EX Era, Vivid Voltage, etc.)",
+    "variant": "any special variant like Holo, Shadowless, ex, VMAX, Full Art, etc.",
     "psa_grade": "the PSA grade if visible (1-10), or null if not graded",
     "price_jpy": "the price in Japanese Yen if visible, or null if not visible",
     "confidence": "high/medium/low - how confident you are in the extraction"
@@ -72,10 +73,15 @@ Be precise and only include information you can clearly see. For price_jpy, only
         print(f"Error analyzing image: {e}")
         return None
 
-def get_pricecharting_price(card_name, set_name, psa_grade):
+def get_pricecharting_price(card_name, set_name, psa_grade, variant=None):
     """Search DuckDuckGo for card on PriceCharting, then scrape the page. Returns (price, url) tuple."""
     try:
-        search_query = f"{card_name} {set_name} # pricecharting"
+        # Build search query with card name, set, and variant for specificity
+        search_parts = [card_name, set_name]
+        if variant:
+            search_parts.append(variant)
+        search_parts.append("pricecharting")
+        search_query = " ".join(search_parts)
         print(f"Searching DuckDuckGo for: {search_query}")
 
         ddgs = DDGS()
@@ -84,24 +90,21 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
         pricecharting_url = None
         for result in results:
             url = result.get("link") or result.get("href") or result.get("url")
-            if url and "pricecharting.com" in url:
-                pricecharting_url = url
-                print(f"  Found PriceCharting link: {pricecharting_url}")
-                break
-
-        if not pricecharting_url:
-            search_query_2 = f"{card_name} pricecharting pokemon"
-            results = ddgs.text(search_query_2, max_results=10)
-            for result in results:
-                url = result.get("link") or result.get("href") or result.get("url")
-                if url and "pricecharting.com" in url:
+            if url and "pricecharting.com" in url and "pokemon" in url.lower():
+                # Prefer links that look like specific card pages (have /product/ or long paths)
+                if "/product/" in url or url.count("/") > 4:
                     pricecharting_url = url
-                    print(f"  Found PriceCharting link (fallback): {pricecharting_url}")
+                    print(f"  Found PriceCharting card link: {pricecharting_url}")
                     break
+                elif not pricecharting_url:
+                    # Keep as fallback if no better link found
+                    pricecharting_url = url
 
         if not pricecharting_url:
             print("  No PriceCharting link found")
             return None
+
+        print(f"  Using PriceCharting link: {pricecharting_url}")
 
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(pricecharting_url, headers=headers, timeout=5)
@@ -204,7 +207,8 @@ def analyze_card():
             pricecharting_result = get_pricecharting_price(
                 card_data['card_name'],
                 card_data.get('set_name', ''),
-                card_data['psa_grade']
+                card_data['psa_grade'],
+                card_data.get('variant', '')
             )
             if isinstance(pricecharting_result, tuple):
                 card_data['pricecharting_price'], card_data['pricecharting_url'] = pricecharting_result

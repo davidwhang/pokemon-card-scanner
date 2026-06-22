@@ -533,6 +533,12 @@
                         <span class="result-label">Card Name</span>
                         <span class="result-value">${data.card_name || '—'}</span>
                     </div>
+                    ${data.card_number ? `
+                    <div class="result-field">
+                        <span class="result-label">Card #</span>
+                        <span class="result-value">${data.card_number}</span>
+                    </div>
+                    ` : ''}
                     <div class="result-field">
                         <span class="result-label">Set</span>
                         <span class="result-value">${data.set_name || '—'}</span>
@@ -637,7 +643,7 @@
 
                     html += `
                         <div class="card-item">
-                            <div class="card-item-header">${card.card_name}</div>
+                            <div class="card-item-header">${card.card_name}${card.card_number ? ` #${card.card_number}` : ''}</div>
                             <div class="card-item-details">
                                 <div><strong>Set:</strong> ${card.set_name}</div>
                                 <div><strong>Grade:</strong> ${card.psa_grade || '—'}</div>
