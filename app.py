@@ -71,33 +71,33 @@ Be precise and only include information you can clearly see. For price_jpy, only
         return None
 
 def get_pricecharting_price(card_name, set_name, psa_grade):
-    """Get price from PriceCharting API"""
-    api_key = os.getenv('PRICECHARTING_API_KEY')
-    if not api_key:
+    """Get price from PriceCharting using Apify scraper"""
+    apify_token = os.getenv('APIFY_API_TOKEN')
+    if not apify_token:
         return None
 
     try:
         search_query = f"{card_name} {set_name} PSA {psa_grade}"
-        url = "https://api.pricecharting.com/v1/products"
+        actor_id = "power4i~pricecharting-pokemon-prices-scraper"
+        url = f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
+
         params = {
-            'q': search_query,
-            'type': 'prices',
-            'category': 'pokemon-cards'
+            'token': apify_token,
+            'searchURL': f"https://www.pricecharting.com/search-products?type=prices&q={quote(search_query)}&category=trading-cards",
+            'maxItems': 5
         }
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'User-Agent': 'Pokemon-Card-Scanner/1.0'
-        }
-        response = requests.get(url, params=params, headers=headers, timeout=3)
+
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
 
-        if data.get('products') and len(data['products']) > 0:
-            product = data['products'][0]
-            if product.get('avg_price'):
-                return float(product['avg_price'])
+        if data and len(data) > 0:
+            price = data[0].get('price')
+            if price:
+                price_str = str(price).replace('$', '').strip()
+                return float(price_str)
     except Exception as e:
-        print(f"PriceCharting API lookup skipped: {e}")
+        print(f"Apify PriceCharting lookup skipped: {e}")
     return None
 
 def get_ebay_price(card_name, set_name, psa_grade):
