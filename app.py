@@ -73,16 +73,14 @@ Be precise and only include information you can clearly see. For price_jpy, only
         return None
 
 def get_pricecharting_price(card_name, set_name, psa_grade):
-    """Search DuckDuckGo for card on PriceCharting, then scrape the page"""
+    """Search DuckDuckGo for card on PriceCharting, then scrape the page. Returns (price, url) tuple."""
     try:
-        # Try search with card name, set, and include "pricecharting" keyword
         search_query = f"{card_name} {set_name} # pricecharting"
         print(f"Searching DuckDuckGo for: {search_query}")
 
         ddgs = DDGS()
         results = ddgs.text(search_query, max_results=10)
 
-        # Find first PriceCharting link
         pricecharting_url = None
         for result in results:
             url = result.get("link") or result.get("href") or result.get("url")
@@ -92,8 +90,6 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
                 break
 
         if not pricecharting_url:
-            print(f"  No PriceCharting link found. Trying alternative search...")
-            # Fallback: simpler search
             search_query_2 = f"{card_name} pricecharting pokemon"
             results = ddgs.text(search_query_2, max_results=10)
             for result in results:
@@ -104,10 +100,9 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
                     break
 
         if not pricecharting_url:
-            print("  No PriceCharting link found in search results")
+            print("  No PriceCharting link found")
             return None
 
-        # Scrape the PriceCharting page
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(pricecharting_url, headers=headers, timeout=5)
         response.raise_for_status()
@@ -115,35 +110,20 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
         soup = BeautifulSoup(response.content, 'html.parser')
         page_text = soup.get_text()
 
-        # Look for PSA grade prices - need to find PSA X followed by price
         if psa_grade:
-            # Look for "PSA {grade}" in the page and find the price after it
-            grade_section = rf"PSA\s*{psa_grade}[^$]*\$?([\d,]+\.?\d*)"
-            match = re.search(grade_section, page_text, re.IGNORECASE)
+            grade_pattern = "PSA\\s*" + str(psa_grade) + "[^$]*\\$?([\\d,]+\\.?\\d*)"
+            match = re.search(grade_pattern, page_text, re.IGNORECASE)
             if match:
                 price_str = match.group(1).replace(',', '')
                 try:
                     price = float(price_str)
                     if 5 < price < 5000:
                         print(f"  ✓ Found PSA {psa_grade} price: ${price}")
-                        return price
+                        return (price, pricecharting_url)
                 except ValueError:
                     pass
 
-            # Alternative: look for price in table cells near PSA grade
-            all_prices = re.findall(r'PSA\s*' + str(psa_grade) + r'[^$]*\$?([\d,]+\.?\d+)', page_text)
-            if all_prices:
-                for price_str in all_prices:
-                    try:
-                        price = float(price_str.replace(',', ''))
-                        if 5 < price < 5000:
-                            print(f"  ✓ Found PSA {psa_grade} price: ${price}")
-                            return price
-                    except ValueError:
-                        pass
-
-        # Fallback: extract highest reasonable price (usually the PSA 10 price)
-        prices = re.findall(r'\$([\d,]+\.?\d+)', page_text)
+        prices = re.findall(r'\$([\\d,]+\\.?\\d+)', page_text)
         if prices:
             valid_prices = []
             for price_str in prices:
@@ -154,12 +134,10 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
                 except ValueError:
                     pass
             if valid_prices:
-                # Return highest price (usually PSA 10)
                 highest_price = max(valid_prices)
                 print(f"  ✓ Found price (highest): ${highest_price}")
-                return highest_price
+                return (highest_price, pricecharting_url)
 
-        print("  No price found on page")
         return None
 
     except Exception as e:
@@ -216,17 +194,22 @@ def analyze_card():
             card_data['discount_price'] = round(card_data['price_usd'] * 0.9, 2)
 
         if card_data.get('psa_grade') and card_data.get('card_name'):
-            pricecharting = get_pricecharting_price(
+            # Get PriceCharting price and URL
+            pricecharting_result = get_pricecharting_price(
                 card_data['card_name'],
                 card_data.get('set_name', ''),
                 card_data['psa_grade']
             )
+            if isinstance(pricecharting_result, tuple):
+                card_data['pricecharting_price'], card_data['pricecharting_url'] = pricecharting_result
+            else:
+                card_data['pricecharting_price'] = pricecharting_result
+
             ebay = get_ebay_price(
                 card_data['card_name'],
                 card_data.get('set_name', ''),
                 card_data['psa_grade']
             )
-            card_data['pricecharting_price'] = pricecharting
             card_data['ebay_price'] = ebay
 
         return jsonify(card_data)
