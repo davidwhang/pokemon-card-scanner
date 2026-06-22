@@ -153,21 +153,27 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None, card_n
         print(f"PriceCharting lookup error: {type(e).__name__}: {e}")
         return None
 
-def get_ebay_links(card_name, set_name, card_number):
+def get_ebay_links(psa_full_details=None, card_name=None, set_name=None, card_number=None):
     """Generate eBay search links for PSA 10 listings"""
-    search_parts = [card_name]
-    if set_name:
-        search_parts.append(set_name)
-    if card_number:
-        search_parts.append(card_number)
-    search_parts.append("PSA 10")
+    # Prefer PSA full details if available, otherwise build from components
+    if psa_full_details:
+        # Use PSA full details as search query, add "PSA 10" at the end
+        search_query = f"{psa_full_details} PSA 10"
+    else:
+        search_parts = [card_name]
+        if set_name:
+            search_parts.append(set_name)
+        if card_number:
+            search_parts.append(card_number)
+        search_parts.append("PSA 10")
+        search_query = " ".join(search_parts)
 
-    search_query = " ".join(search_parts)
-    base_url = f"https://www.ebay.com/sch/i.html?_nkw={quote(search_query)}&_sacat=213"
+    # Use _sacat=261328 (Trading Cards category) for more accurate results
+    base_url = f"https://www.ebay.com/sch/i.html?_nkw={quote(search_query)}&_sacat=261328"
 
     return {
         'listings': base_url,
-        'sold': base_url + "&rt=nc&LH_Sold=1"
+        'sold': base_url + "&LH_Sold=1"
     }
 
 @app.route('/')
@@ -211,8 +217,9 @@ def analyze_card():
                 card_data['pricecharting_price'] = pricecharting_result.get('price')
                 card_data['pricecharting_url'] = pricecharting_result.get('url')
 
-            # Generate eBay search links
+            # Generate eBay search links (prefer PSA full details if available)
             ebay_links = get_ebay_links(
+                card_data.get('psa_full_details'),
                 card_data['card_name'],
                 card_data.get('set_name', ''),
                 card_data.get('card_number', '')
