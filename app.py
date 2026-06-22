@@ -108,9 +108,15 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
             items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
             print(f"  {actor_id}: Found {len(items)} items")
 
+            for i, item in enumerate(items[:3]):  # Print first 3 items for debugging
+                print(f"    Item {i}: {item}")
+
             for item in items:
-                if item.get("price"):
-                    price_str = str(item["price"]).replace('$', '').replace(',', '').strip()
+                # Try different price field names
+                price_value = item.get("price") or item.get("productPrice") or item.get("avgPrice") or item.get("currentPrice") or item.get("averagePrice")
+
+                if price_value:
+                    price_str = str(price_value).replace('$', '').replace(',', '').strip()
                     try:
                         price = float(price_str)
                         print(f"  ✓ Success with {actor_id}: ${price}")
