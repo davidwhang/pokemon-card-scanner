@@ -533,12 +533,10 @@
                         <span class="result-label">Card Name</span>
                         <span class="result-value">${data.card_name || '—'}</span>
                     </div>
-                    ${data.card_number ? `
                     <div class="result-field">
                         <span class="result-label">Card #</span>
-                        <span class="result-value">${data.card_number}</span>
+                        <span class="result-value">${data.card_number || 'Unreadable'}</span>
                     </div>
-                    ` : ''}
                     <div class="result-field">
                         <span class="result-label">Set</span>
                         <span class="result-value">${data.set_name || '—'}</span>

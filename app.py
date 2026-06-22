@@ -121,14 +121,14 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None, card_n
         # The page shows prices like "PSA 10 $99.96 volume: 2 sales per week"
 
         # Extract PSA 10 price from the price tier section
-        # Patterns to match "PSA 10 $XXX.XX" or "Grade 10 $XXX.XX"
+        # Use DOTALL flag to match across newlines, since BeautifulSoup's get_text() may split prices onto separate lines
         psa10_patterns = [
-            r"PSA\s*10\s*\$(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)",
-            r"Grade\s*10\s*\$(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)",
+            r"PSA\s*10[\s\n]*\$(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)",
+            r"Grade\s*10[\s\n]*\$(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)",
         ]
 
         for pattern in psa10_patterns:
-            matches = re.findall(pattern, page_text, re.IGNORECASE)
+            matches = re.findall(pattern, page_text, re.IGNORECASE | re.MULTILINE)
             if matches:
                 # Take the first match (should be the main price tier)
                 price_str = matches[0]
