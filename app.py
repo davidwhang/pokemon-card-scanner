@@ -10,7 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
 from apify_client import ApifyClient
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 app = Flask(__name__)
 CORS(app)
@@ -75,19 +75,33 @@ Be precise and only include information you can clearly see. For price_jpy, only
 def get_pricecharting_price(card_name, set_name, psa_grade):
     """Search DuckDuckGo for card on PriceCharting, then scrape the page"""
     try:
-        search_query = f"{card_name} {set_name} pricecharting"
+        # Try search with card name, set, and include "pricecharting" keyword
+        search_query = f"{card_name} {set_name} # pricecharting"
         print(f"Searching DuckDuckGo for: {search_query}")
 
         ddgs = DDGS()
-        results = ddgs.text(search_query, max_results=5)
+        results = ddgs.text(search_query, max_results=10)
 
         # Find first PriceCharting link
         pricecharting_url = None
         for result in results:
-            if "pricecharting.com" in result.get("href", ""):
-                pricecharting_url = result["href"]
+            url = result.get("link") or result.get("href") or result.get("url")
+            if url and "pricecharting.com" in url:
+                pricecharting_url = url
                 print(f"  Found PriceCharting link: {pricecharting_url}")
                 break
+
+        if not pricecharting_url:
+            print(f"  No PriceCharting link found. Trying alternative search...")
+            # Fallback: simpler search
+            search_query_2 = f"{card_name} pricecharting pokemon"
+            results = ddgs.text(search_query_2, max_results=10)
+            for result in results:
+                url = result.get("link") or result.get("href") or result.get("url")
+                if url and "pricecharting.com" in url:
+                    pricecharting_url = url
+                    print(f"  Found PriceCharting link (fallback): {pricecharting_url}")
+                    break
 
         if not pricecharting_url:
             print("  No PriceCharting link found in search results")
