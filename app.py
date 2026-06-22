@@ -115,71 +115,36 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None, card_n
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content, 'html.parser')
-
-        # Look for completed auction prices in table rows
-        auction_prices = []
-        auction_data = []
-
-        # Find all table rows that contain price data (skip header rows)
-        rows = soup.find_all('tr')
-        for row in rows:
-            cells = row.find_all('td')
-            if len(cells) >= 2:  # Data rows have multiple cells
-                row_text = row.get_text().strip()
-
-                # Skip header rows and empty rows
-                if not row_text or 'Sale Date' in row_text or 'TW Title' in row_text or 'Price' in row_text:
-                    continue
-
-                # Extract price from the last cell (Price column)
-                price_cell = cells[-1].get_text().strip()
-                price_match = re.search(r'\$(\d+(?:,\d{3})*(?:\.\d{2})?)', price_cell)
-
-                if price_match:
-                    try:
-                        price = float(price_match.group(1).replace(',', ''))
-                        # Filter for reasonable PSA 10 prices (between $50 and $5000)
-                        if 50 < price < 5000:
-                            auction_prices.append(price)
-                            # Store the title and price for display
-                            title = cells[1].get_text().strip() if len(cells) > 1 else 'Unknown'
-                            auction_data.append({'title': title, 'price': price})
-                    except (ValueError, IndexError):
-                        pass
-
-        if auction_prices:
-            avg_price = sum(auction_prices) / len(auction_prices)
-            print(f"  ✓ Found {len(auction_prices)} auction sales, average PSA 10 price: ${avg_price:.2f}")
-            # Return price, URL, and auction data for display
-            return {
-                'price': avg_price,
-                'url': auction_url,
-                'auction_data': auction_data
-            }
-
-        # Fallback: try to extract the listed PSA 10 price from price table
         page_text = soup.get_text()
+
+        # Look for the listed PSA 10 price in the price tier section
+        # The page shows prices like "PSA 10 $99.96 volume: 2 sales per week"
+
+        # Extract PSA 10 price from the price tier section
+        # Patterns to match "PSA 10 $XXX.XX" or "Grade 10 $XXX.XX"
         psa10_patterns = [
-            r"PSA\s*10[^$]*\$(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)",
-            r"Grade\s*10[^$]*\$(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)",
+            r"PSA\s*10\s*\$(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)",
+            r"Grade\s*10\s*\$(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)",
         ]
 
         for pattern in psa10_patterns:
             matches = re.findall(pattern, page_text, re.IGNORECASE)
             if matches:
-                for price_str in matches:
-                    try:
-                        price = float(price_str.replace(',', ''))
-                        if 50 < price < 10000:
-                            print(f"  ✓ Found listed PSA 10 price: ${price}")
-                            return {
-                                'price': price,
-                                'url': pricecharting_url,
-                                'auction_data': []
-                            }
-                    except ValueError:
-                        pass
+                # Take the first match (should be the main price tier)
+                price_str = matches[0]
+                try:
+                    price = float(price_str.replace(',', ''))
+                    if 10 < price < 50000:  # Reasonable range for PSA 10 cards
+                        print(f"  ✓ Found listed PSA 10 price: ${price}")
+                        return {
+                            'price': price,
+                            'url': pricecharting_url,
+                            'auction_data': []
+                        }
+                except ValueError:
+                    pass
 
+        print("  No PSA 10 price found")
         return None
 
     except Exception as e:
