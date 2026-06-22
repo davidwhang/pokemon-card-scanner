@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokemon Card Scanner - Japan Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 15px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        input[type="file"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        video {
+            width: 100%;
+            border-radius: 8px;
+            background: #f0f0f0;
+            margin-bottom: 15px;
+        }
+
+        .camera-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .camera-controls button {
+            flex: 1;
+        }
+
+        button {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        button.secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .result-field {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .result-field:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .result-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .price-highlight {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .confidence {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .confidence.high {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .confidence.medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .confidence.low {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .cards-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .card-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .card-item-header {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .card-item-details {
+            font-size: 12px;
+            color: #666;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f0f0f0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .image-preview {
+            width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            object-fit: cover;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .button-group button {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎴 Card Scanner</h1>
+            <p>Scan Pokemon cards in Japan • Get instant USD prices</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('camera')">📷 Camera</button>
+            <button class="tab-btn" onclick="switchTab('manual')">✏️ Manual</button>
+            <button class="tab-btn" onclick="switchTab('history')">📋 History</button>
+        </div>
+
+        <!-- CAMERA TAB -->
+        <div id="camera" class="tab-content active">
+            <video id="video" autoplay playsinline></video>
+            <div class="camera-controls">
+                <button onclick="capturePhoto()">📸 Capture</button>
+                <button class="secondary" onclick="toggleCamera()">Switch Camera</button>
+            </div>
+
+            <canvas id="canvas" style="display:none;"></canvas>
+            <img id="preview" class="image-preview" style="display:none;">
+
+            <div id="cameraManualPrice" style="display:none;" class="input-group">
+                <label>Price in JPY (if not visible in photo):</label>
+                <input type="number" id="cameraPrice" placeholder="e.g., 5000" step="100">
+            </div>
+
+            <button id="analyzeBtn" style="display:none; width:100%;" onclick="analyzeCapture()">Analyze Card</button>
+
+            <div id="cameraResult" style="display:none;">
+                <div id="resultDisplay"></div>
+                <div class="button-group">
+                    <button onclick="saveCurrentCard()">💾 Save Card</button>
+                    <button class="secondary" onclick="resetCamera()">← Retake</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MANUAL TAB -->
+        <div id="manual" class="tab-content">
+            <div class="input-group">
+                <label>Card Name *</label>
+                <input type="text" id="manualCardName" placeholder="e.g., Charizard">
+            </div>
+            <div class="input-group">
+                <label>Set Name *</label>
+                <input type="text" id="manualSetName" placeholder="e.g., Base Set">
+            </div>
+            <div class="input-group">
+                <label>Variant</label>
+                <input type="text" id="manualVariant" placeholder="e.g., Holo, 1st Edition">
+            </div>
+            <div class="input-group">
+                <label>PSA Grade</label>
+                <input type="number" id="manualGrade" placeholder="1-10" min="1" max="10">
+            </div>
+            <div class="input-group">
+                <label>Price in JPY *</label>
+                <input type="number" id="manualPrice" placeholder="e.g., 5000" step="100">
+            </div>
+            <button onclick="analyzeManual()" style="width:100%;">🔍 Get Prices & Save</button>
+            <div id="manualResult" style="display:none; margin-top:20px;">
+                <div id="manualResultDisplay"></div>
+            </div>
+        </div>
+
+        <!-- HISTORY TAB -->
+        <div id="history" class="tab-content">
+            <button onclick="loadCards()" style="width:100%; margin-bottom:15px;">🔄 Refresh</button>
+            <button onclick="exportCSV()" class="secondary" style="width:100%; margin-bottom:15px;">📥 Export to CSV</button>
+            <div class="cards-list" id="cardsList">
+                <p style="text-align: center; color: #999; padding: 20px;">No cards saved yet</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPhoto = null;
+        let currentResult = null;
+        let stream = null;
+        let facingMode = 'environment'; // Back camera by default
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tab).classList.add('active');
+            event.target.classList.add('active');
+
+            if (tab === 'camera') {
+                startCamera();
+            } else if (tab === 'history') {
+                loadCards();
+            }
+        }
+
+        // Camera functions
+        async function startCamera() {
+            if (stream) return;
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: facingMode }
+                });
+                document.getElementById('video').srcObject = stream;
+            } catch (err) {
+                alert('Camera access denied. Please enable camera permissions.');
+            }
+        }
+
+        function toggleCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            facingMode = facingMode === 'environment' ? 'user' : 'environment';
+            startCamera();
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+
+            currentPhoto = canvas.toDataURL('image/jpeg');
+            document.getElementById('preview').src = currentPhoto;
+            document.getElementById('preview').style.display = 'block';
+            document.getElementById('video').style.display = 'none';
+            document.getElementById('cameraManualPrice').style.display = 'block';
+            document.getElementById('analyzeBtn').style.display = 'block';
+            document.getElementById('cameraResult').style.display = 'none';
+        }
+
+        async function analyzeCapture() {
+            const price = document.getElementById('cameraPrice').value;
+            showLoading('cameraResult');
+
+            try {
+                const response = await fetch('/api/analyze-card', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: currentPhoto.split(',')[1],
+                        manual_price_jpy: price || null
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error);
+
+                currentResult = data;
+                displayResult(data, 'cameraResult');
+            } catch (err) {
+                document.getElementById('cameraResult').innerHTML = `<div class="error">Error: ${err.message}</div>`;
+            }
+        }
+
+        function resetCamera() {
+            currentPhoto = null;
+            currentResult = null;
+            document.getElementById('preview').style.display = 'none';
+            document.getElementById('video').style.display = 'block';
+            document.getElementById('cameraManualPrice').style.display = 'none';
+            document.getElementById('analyzeBtn').style.display = 'none';
+            document.getElementById('cameraResult').style.display = 'none';
+            document.getElementById('cameraPrice').value = '';
+        }
+
+        // Manual input
+        async function analyzeManual() {
+            const cardName = document.getElementById('manualCardName').value;
+            const setName = document.getElementById('manualSetName').value;
+            const price = document.getElementById('manualPrice').value;
+
+            if (!cardName || !setName || !price) {
+                alert('Please fill in Card Name, Set Name, and Price');
+                return;
+            }
+
+            showLoading('manualResult');
+
+            try {
+                const response = await fetch('/api/analyze-card', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: null,
+                        manual_price_jpy: price,
+                        card_name: cardName,
+                        set_name: setName,
+                        variant: document.getElementById('manualVariant').value,
+                        psa_grade: document.getElementById('manualGrade').value || null
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error);
+
+                // For manual input, use the values as entered
+                data.card_name = cardName;
+                data.set_name = setName;
+                data.variant = document.getElementById('manualVariant').value;
+                data.psa_grade = document.getElementById('manualGrade').value ? parseInt(document.getElementById('manualGrade').value) : null;
+                data.price_jpy = parseFloat(price);
+                data.price_usd = Math.round(parseFloat(price) / 150 * 100) / 100;
+                data.discount_price = Math.round(data.price_usd * 0.9 * 100) / 100;
+
+                currentResult = data;
+                displayResult(data, 'manualResult');
+                document.getElementById('manualResult').style.display = 'block';
+            } catch (err) {
+                document.getElementById('manualResult').innerHTML = `<div class="error">Error: ${err.message}</div>`;
+                document.getElementById('manualResult').style.display = 'block';
+            }
+        }
+
+        // Display results
+        function displayResult(data, containerId) {
+            const html = `
+                <div class="result-card">
+                    <div class="result-field">
+                        <span class="result-label">Card Name</span>
+                        <span class="result-value">${data.card_name || '—'}</span>
+                    </div>
+                    <div class="result-field">
+                        <span class="result-label">Set</span>
+                        <span class="result-value">${data.set_name || '—'}</span>
+                    </div>
+                    ${data.variant ? `
+                    <div class="result-field">
+                        <span class="result-label">Variant</span>
+                        <span class="result-value">${data.variant}</span>
+                    </div>
+                    ` : ''}
+                    ${data.psa_grade ? `
+                    <div class="result-field">
+                        <span class="result-label">PSA Grade</span>
+                        <span class="result-value">${data.psa_grade}/10</span>
+                    </div>
+                    ` : ''}
+                    <div class="result-field">
+                        <span class="result-label">Price (JPY)</span>
+                        <span class="result-value price-highlight">¥${data.price_jpy?.toLocaleString() || '—'}</span>
+                    </div>
+                    <div class="result-field">
+                        <span class="result-label">Price (USD)</span>
+                        <span class="result-value price-highlight">$${data.price_usd?.toFixed(2) || '—'}</span>
+                    </div>
+                    <div class="result-field">
+                        <span class="result-label">With 10% Discount</span>
+                        <span class="result-value price-highlight">$${data.discount_price?.toFixed(2) || '—'}</span>
+                    </div>
+                    ${data.pricecharting_price ? `
+                    <div class="result-field">
+                        <span class="result-label">PriceCharting</span>
+                        <span class="result-value">$${data.pricecharting_price.toFixed(2)}</span>
+                    </div>
+                    ` : ''}
+                    ${data.ebay_price ? `
+                    <div class="result-field">
+                        <span class="result-label">eBay Avg</span>
+                        <span class="result-value">$${data.ebay_price.toFixed(2)}</span>
+                    </div>
+                    ` : ''}
+                    ${data.confidence ? `
+                    <div class="result-field">
+                        <span class="result-label">Confidence</span>
+                        <span class="confidence ${data.confidence.toLowerCase()}">${data.confidence}</span>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            document.getElementById(containerId).innerHTML = html;
+            document.getElementById(containerId).style.display = 'block';
+        }
+
+        function showLoading(containerId) {
+            document.getElementById(containerId).innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Analyzing card...</p>
+                </div>
+            `;
+            document.getElementById(containerId).style.display = 'block';
+        }
+
+        // Save card
+        async function saveCurrentCard() {
+            if (!currentResult) return;
+
+            try {
+                const response = await fetch('/api/save-card', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentResult)
+                });
+
+                if (!response.ok) throw new Error('Failed to save');
+
+                // Show success message
+                const container = document.getElementById('cameraResult');
+                container.innerHTML = `<div class="success">✓ Card saved successfully!</div>` + container.innerHTML;
+
+                setTimeout(() => resetCamera(), 2000);
+            } catch (err) {
+                alert('Error saving card: ' + err.message);
+            }
+        }
+
+        // Load and display cards
+        async function loadCards() {
+            try {
+                const response = await fetch('/api/get-cards');
+                const cards = await response.json();
+
+                if (cards.length === 0) {
+                    document.getElementById('cardsList').innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No cards saved yet</p>';
+                    return;
+                }
+
+                let html = '';
+                let totalJPY = 0;
+                let totalUSD = 0;
+                let totalDiscount = 0;
+
+                cards.forEach(card => {
+                    totalJPY += card.price_jpy || 0;
+                    totalUSD += card.price_usd || 0;
+                    totalDiscount += card.discount_price || 0;
+
+                    html += `
+                        <div class="card-item">
+                            <div class="card-item-header">${card.card_name}</div>
+                            <div class="card-item-details">
+                                <div><strong>Set:</strong> ${card.set_name}</div>
+                                <div><strong>Grade:</strong> ${card.psa_grade || '—'}</div>
+                                <div><strong>JPY:</strong> ¥${card.price_jpy?.toLocaleString()}</div>
+                                <div><strong>USD:</strong> $${card.price_usd?.toFixed(2)}</div>
+                                <div><strong>Discount:</strong> $${card.discount_price?.toFixed(2)}</div>
+                                ${card.pricecharting_price ? `<div><strong>PC:</strong> $${card.pricecharting_price.toFixed(2)}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html = `
+                    <div class="result-card" style="background: white; border: 2px solid #667eea;">
+                        <div class="result-field">
+                            <span class="result-label">Total Cards</span>
+                            <span class="result-value">${cards.length}</span>
+                        </div>
+                        <div class="result-field">
+                            <span class="result-label">Total JPY</span>
+                            <span class="result-value">¥${totalJPY.toLocaleString()}</span>
+                        </div>
+                        <div class="result-field">
+                            <span class="result-label">Total USD</span>
+                            <span class="result-value price-highlight">$${totalUSD.toFixed(2)}</span>
+                        </div>
+                        <div class="result-field">
+                            <span class="result-label">With 10% Discount</span>
+                            <span class="result-value price-highlight">$${totalDiscount.toFixed(2)}</span>
+                        </div>
+                    </div>
+                ` + html;
+
+                document.getElementById('cardsList').innerHTML = html;
+            } catch (err) {
+                document.getElementById('cardsList').innerHTML = `<div class="error">Error loading cards</div>`;
+            }
+        }
+
+        // Export to CSV
+        async function exportCSV() {
+            try {
+                const response = await fetch('/api/export-csv');
+                const csv = await response.text();
+
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'pokemon_cards.csv';
+                a.click();
+            } catch (err) {
+                alert('Error exporting CSV');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            startCamera();
+        });
+    </script>
+</body>
+</html>
