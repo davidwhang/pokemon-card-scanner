@@ -324,6 +324,13 @@
                 <button class="secondary" onclick="toggleCamera()">Switch Camera</button>
             </div>
 
+            <div style="text-align: center; margin: 15px 0; color: #999;">— OR —</div>
+
+            <div class="camera-controls">
+                <input type="file" id="fileUpload" accept="image/*" style="display:none;" onchange="handleFileUpload(event)">
+                <button class="secondary" onclick="document.getElementById('fileUpload').click()" style="flex:1;">📁 Choose from Gallery</button>
+            </div>
+
             <canvas id="canvas" style="display:none;"></canvas>
             <img id="preview" class="image-preview" style="display:none;">
 
@@ -455,6 +462,24 @@
             context.drawImage(video, 0, 0);
 
             currentPhoto = canvas.toDataURL('image/jpeg');
+            showPhotoPreview();
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentPhoto = e.target.result;
+                showPhotoPreview();
+                // Reset file input so same file can be selected again
+                document.getElementById('fileUpload').value = '';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function showPhotoPreview() {
             document.getElementById('preview').src = currentPhoto;
             document.getElementById('preview').style.display = 'block';
             document.getElementById('video').style.display = 'none';
