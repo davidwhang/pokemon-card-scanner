@@ -158,7 +158,15 @@ def get_ebay_links(psa_full_details=None, card_name=None, set_name=None, card_nu
     # Prefer PSA full details if available, otherwise build from components
     if psa_full_details:
         # Use PSA full details as search query, add "PSA 10" at the end
-        search_query = f"{psa_full_details} PSA 10"
+        # Add spaces around special characters and clean up
+        search_query = psa_full_details.strip()
+        # Replace multiple spaces with single space
+        search_query = " ".join(search_query.split())
+        # Add space before # if missing
+        search_query = search_query.replace('#', ' #')
+        # Add space before / if missing
+        search_query = search_query.replace('/', ' / ')
+        search_query = f"{search_query} PSA 10"
     else:
         search_parts = [card_name]
         if set_name:

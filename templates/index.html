@@ -336,10 +336,11 @@
 
             <div id="cameraResult" style="display:none;">
                 <div id="resultDisplay"></div>
-                <div class="button-group">
-                    <button onclick="saveCurrentCard()">💾 Save Card</button>
-                    <button class="secondary" onclick="resetCamera()">← Retake</button>
-                </div>
+            </div>
+
+            <div id="cameraResultButtons" class="button-group" style="display:none; margin-top:20px;">
+                <button onclick="saveCurrentCard()">💾 Save Card</button>
+                <button class="secondary" onclick="resetCamera()">← Retake</button>
             </div>
         </div>
 
@@ -477,6 +478,7 @@
             document.getElementById('cameraManualPrice').style.display = 'none';
             document.getElementById('analyzeBtn').style.display = 'none';
             document.getElementById('cameraResult').style.display = 'none';
+            document.getElementById('cameraResultButtons').style.display = 'none';
             document.getElementById('cameraPrice').value = '';
             startCamera(); // Restart the live camera feed
         }
@@ -568,6 +570,11 @@
 
         // Display results
         function displayResult(data, containerId) {
+            // Show buttons if this is the camera result
+            if (containerId === 'cameraResult') {
+                document.getElementById('cameraResultButtons').style.display = 'flex';
+            }
+
             const html = `
                 <div class="result-card">
                     <div class="result-field">
