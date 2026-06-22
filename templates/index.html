@@ -553,6 +553,18 @@
                         <span class="result-value">${data.psa_grade}/10</span>
                     </div>
                     ` : ''}
+                    ${data.psa_full_details ? `
+                    <div class="result-field">
+                        <span class="result-label">PSA Full Details</span>
+                        <span class="result-value" style="white-space: pre-wrap; font-size: 12px; line-height: 1.4;">${data.psa_full_details}</span>
+                    </div>
+                    ` : ''}
+                    ${data.psa_cert_number ? `
+                    <div class="result-field">
+                        <span class="result-label">PSA Cert Number</span>
+                        <span class="result-value"><a href="https://www.psacard.com/cert/${data.psa_cert_number}/psa" target="_blank" style="color: #667eea; text-decoration: underline;">${data.psa_cert_number}</a></span>
+                    </div>
+                    ` : ''}
                     <div class="result-field">
                         <span class="result-label">Price (JPY)</span>
                         <span class="result-value price-highlight">¥${data.price_jpy?.toLocaleString() || '—'}</span>

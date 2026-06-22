@@ -52,11 +52,13 @@ def analyze_card_image(image_base64):
     "set_name": "the set this card is from (e.g., Base Set, EX Era, Vivid Voltage, etc.)",
     "variant": "any special variant like Holo, Shadowless, ex, VMAX, Full Art, etc.",
     "psa_grade": "the PSA grade if visible (1-10), or null if not graded",
+    "psa_full_details": "the exact text from the PSA label/tag, including all lines (e.g., '2020 POKEMON SWSH #185\\nFA/PKMN.CENTER LADY\\nVIVID VOLTAGE\\nGEM MT 10'), or null if not visible",
+    "psa_cert_number": "the PSA certification number if visible on the label (e.g., 80315635), or null if not visible",
     "price_jpy": "the price in Japanese Yen if visible, or null if not visible",
     "confidence": "high/medium/low - how confident you are in the extraction"
 }
 
-Be precise and only include information you can clearly see. For price_jpy, only include if you can clearly read the price on the card."""
+Be precise and only include information you can clearly see. For psa_full_details, extract EXACTLY what is written on the PSA label with line breaks. For price_jpy, only include if you can clearly read the price on the card."""
                         }
                     ],
                 }
