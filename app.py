@@ -71,22 +71,33 @@ Be precise and only include information you can clearly see. For price_jpy, only
         return None
 
 def get_pricecharting_price(card_name, set_name, psa_grade):
-    """Scrape PriceCharting for card price"""
+    """Get price from PriceCharting API"""
+    api_key = os.getenv('PRICECHARTING_API_KEY')
+    if not api_key:
+        return None
+
     try:
         search_query = f"{card_name} {set_name} PSA {psa_grade}"
-        url = f"https://www.pricecharting.com/search-products?type=prices&q={quote(search_query)}&category=trading-cards"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        response = requests.get(url, headers=headers, timeout=3)
+        url = "https://api.pricecharting.com/v1/products"
+        params = {
+            'q': search_query,
+            'type': 'prices',
+            'category': 'pokemon-cards'
+        }
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'User-Agent': 'Pokemon-Card-Scanner/1.0'
+        }
+        response = requests.get(url, params=params, headers=headers, timeout=3)
         response.raise_for_status()
-        soup = BeautifulSoup(response.content, 'html.parser')
-        price_elem = soup.find('span', class_='current-price')
-        if price_elem:
-            price_text = price_elem.get_text(strip=True)
-            price_match = re.search(r'\$(\d+\.?\d*)', price_text)
-            if price_match:
-                return float(price_match.group(1))
+        data = response.json()
+
+        if data.get('products') and len(data['products']) > 0:
+            product = data['products'][0]
+            if product.get('avg_price'):
+                return float(product['avg_price'])
     except Exception as e:
-        print(f"PriceCharting lookup skipped: {e}")
+        print(f"PriceCharting API lookup skipped: {e}")
     return None
 
 def get_ebay_price(card_name, set_name, psa_grade):
