@@ -76,7 +76,7 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
         search_query = f"{card_name} {set_name} PSA {psa_grade}"
         url = f"https://www.pricecharting.com/search-products?type=prices&q={quote(search_query)}&category=trading-cards"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=3)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
         price_elem = soup.find('span', class_='current-price')
@@ -86,7 +86,7 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
             if price_match:
                 return float(price_match.group(1))
     except Exception as e:
-        print(f"Error getting PriceCharting price: {e}")
+        print(f"PriceCharting lookup skipped: {e}")
     return None
 
 def get_ebay_price(card_name, set_name, psa_grade):
@@ -95,7 +95,7 @@ def get_ebay_price(card_name, set_name, psa_grade):
         search_query = f"Pokemon {card_name} {set_name} PSA {psa_grade}"
         url = f"https://www.ebay.com/sch/i.html?_nkw={quote(search_query)}&_sacat=213&rt=nc&LH_Sold=1"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=3)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
         prices = []
@@ -107,7 +107,7 @@ def get_ebay_price(card_name, set_name, psa_grade):
         if prices:
             return sum(prices) / len(prices)
     except Exception as e:
-        print(f"Error getting eBay price: {e}")
+        print(f"eBay lookup skipped: {e}")
     return None
 
 @app.route('/')
