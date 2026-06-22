@@ -569,10 +569,18 @@
                         <span class="result-label">PriceCharting</span>
                         <span class="result-value">${data.pricecharting_price ? `<a href="${data.pricecharting_url}" target="_blank" style="color: inherit; text-decoration: underline;">$${data.pricecharting_price.toFixed(2)}</a>` : '—'}</span>
                     </div>
+                    ${data.ebay_listings_url ? `
                     <div class="result-field">
-                        <span class="result-label">eBay Avg</span>
-                        <span class="result-value">${data.ebay_price ? `$${data.ebay_price.toFixed(2)}` : '—'}</span>
+                        <span class="result-label">eBay PSA 10 Listings</span>
+                        <span class="result-value"><a href="${data.ebay_listings_url}" target="_blank" style="color: #667eea; text-decoration: underline;">Search eBay</a></span>
                     </div>
+                    ` : ''}
+                    ${data.ebay_sold_url ? `
+                    <div class="result-field">
+                        <span class="result-label">eBay PSA 10 Sold</span>
+                        <span class="result-value"><a href="${data.ebay_sold_url}" target="_blank" style="color: #667eea; text-decoration: underline;">View Sold</a></span>
+                    </div>
+                    ` : ''}
                     ${data.confidence ? `
                     <div class="result-field">
                         <span class="result-label">Confidence</span>

@@ -151,26 +151,22 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None, card_n
         print(f"PriceCharting lookup error: {type(e).__name__}: {e}")
         return None
 
-def get_ebay_price(card_name, set_name, psa_grade):
-    """Get eBay price estimate"""
-    try:
-        search_query = f"Pokemon {card_name} {set_name} PSA {psa_grade}"
-        url = f"https://www.ebay.com/sch/i.html?_nkw={quote(search_query)}&_sacat=213&rt=nc&LH_Sold=1"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        response = requests.get(url, headers=headers, timeout=3)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, 'html.parser')
-        prices = []
-        for price_elem in soup.find_all('span', class_='BOLD'):
-            price_text = price_elem.get_text(strip=True)
-            price_match = re.search(r'\$(\d+\.?\d*)', price_text)
-            if price_match:
-                prices.append(float(price_match.group(1)))
-        if prices:
-            return sum(prices) / len(prices)
-    except Exception as e:
-        print(f"eBay lookup skipped: {e}")
-    return None
+def get_ebay_links(card_name, set_name, card_number):
+    """Generate eBay search links for PSA 10 listings"""
+    search_parts = [card_name]
+    if set_name:
+        search_parts.append(set_name)
+    if card_number:
+        search_parts.append(card_number)
+    search_parts.append("PSA 10")
+
+    search_query = " ".join(search_parts)
+    base_url = f"https://www.ebay.com/sch/i.html?_nkw={quote(search_query)}&_sacat=213"
+
+    return {
+        'listings': base_url,
+        'sold': base_url + "&rt=nc&LH_Sold=1"
+    }
 
 @app.route('/')
 def index():
@@ -212,14 +208,15 @@ def analyze_card():
             if pricecharting_result:
                 card_data['pricecharting_price'] = pricecharting_result.get('price')
                 card_data['pricecharting_url'] = pricecharting_result.get('url')
-                card_data['auction_data'] = pricecharting_result.get('auction_data', [])
 
-            ebay = get_ebay_price(
+            # Generate eBay search links
+            ebay_links = get_ebay_links(
                 card_data['card_name'],
                 card_data.get('set_name', ''),
-                card_data['psa_grade']
+                card_data.get('card_number', '')
             )
-            card_data['ebay_price'] = ebay
+            card_data['ebay_listings_url'] = ebay_links['listings']
+            card_data['ebay_sold_url'] = ebay_links['sold']
 
         return jsonify(card_data)
 
