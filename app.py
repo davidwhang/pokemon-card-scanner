@@ -3,53 +3,29 @@ from flask_cors import CORS
 import anthropic
 import base64
 import json
-import sqlite3
 import os
 from datetime import datetime
 import re
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
-import threading
-from functools import lru_cache
 
 app = Flask(__name__)
 CORS(app)
 
-# Initialize database
-DB_PATH = 'pokemon_cards.db'
+# In-memory card storage (persists during app runtime)
+cards_storage = []
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS cards (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            card_name TEXT,
-            set_name TEXT,
-            variant TEXT,
-            psa_grade INTEGER,
-            price_jpy REAL,
-            price_usd REAL,
-            discount_price REAL,
-            pricecharting_price REAL,
-            ebay_price REAL,
-            image_path TEXT,
-            created_at TIMESTAMP,
-            source TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# Initialize Anthropic client
-client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+def get_client():
+    api_key = os.getenv('ANTHROPIC_API_KEY')
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY not set")
+    return anthropic.Anthropic(api_key=api_key)
 
 def analyze_card_image(image_base64):
     """Use Claude to analyze card image and extract details"""
     try:
+        client = get_client()
         message = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=1024,
@@ -84,7 +60,6 @@ Be precise and only include information you can clearly see. For price_jpy, only
             ],
         )
 
-        # Extract JSON from response
         response_text = message.content[0].text
         json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
         if json_match:
@@ -95,22 +70,16 @@ Be precise and only include information you can clearly see. For price_jpy, only
         print(f"Error analyzing image: {e}")
         return None
 
-@lru_cache(maxsize=128)
 def get_pricecharting_price(card_name, set_name, psa_grade):
     """Scrape PriceCharting for card price"""
     try:
         search_query = f"{card_name} {set_name} PSA {psa_grade}"
         url = f"https://www.pricecharting.com/search-products?type=prices&q={quote(search_query)}&category=trading-cards"
-
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
-
         soup = BeautifulSoup(response.content, 'html.parser')
         price_elem = soup.find('span', class_='current-price')
-
         if price_elem:
             price_text = price_elem.get_text(strip=True)
             price_match = re.search(r'\$(\d+\.?\d*)', price_text)
@@ -118,7 +87,6 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
                 return float(price_match.group(1))
     except Exception as e:
         print(f"Error getting PriceCharting price: {e}")
-
     return None
 
 def get_ebay_price(card_name, set_name, psa_grade):
@@ -126,32 +94,29 @@ def get_ebay_price(card_name, set_name, psa_grade):
     try:
         search_query = f"Pokemon {card_name} {set_name} PSA {psa_grade}"
         url = f"https://www.ebay.com/sch/i.html?_nkw={quote(search_query)}&_sacat=213&rt=nc&LH_Sold=1"
-
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
-
         soup = BeautifulSoup(response.content, 'html.parser')
         prices = []
-
         for price_elem in soup.find_all('span', class_='BOLD'):
             price_text = price_elem.get_text(strip=True)
             price_match = re.search(r'\$(\d+\.?\d*)', price_text)
             if price_match:
                 prices.append(float(price_match.group(1)))
-
         if prices:
             return sum(prices) / len(prices)
     except Exception as e:
         print(f"Error getting eBay price: {e}")
-
     return None
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/health')
+def health():
+    return jsonify({'status': 'ok', 'message': 'Pokemon Card Scanner is running!'}), 200
 
 @app.route('/api/analyze-card', methods=['POST'])
 def analyze_card():
@@ -161,22 +126,18 @@ def analyze_card():
         image_base64 = data.get('image')
         manual_price = data.get('manual_price_jpy')
 
-        # Analyze image with Claude
         card_data = analyze_card_image(image_base64)
 
         if not card_data:
             return jsonify({'error': 'Failed to analyze image'}), 400
 
-        # Use manual price if provided, otherwise use extracted
         if manual_price:
             card_data['price_jpy'] = float(manual_price)
 
-        # Calculate USD price (150 JPY = $1 USD)
         if card_data.get('price_jpy'):
             card_data['price_usd'] = round(card_data['price_jpy'] / 150, 2)
             card_data['discount_price'] = round(card_data['price_usd'] * 0.9, 2)
 
-        # Get market prices (run in background to not block)
         if card_data.get('psa_grade') and card_data.get('card_name'):
             pricecharting = get_pricecharting_price(
                 card_data['card_name'],
@@ -199,36 +160,13 @@ def analyze_card():
 
 @app.route('/api/save-card', methods=['POST'])
 def save_card():
-    """Save card to database"""
+    """Save card to in-memory storage"""
     try:
         data = request.get_json()
-
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('''
-            INSERT INTO cards (
-                card_name, set_name, variant, psa_grade, price_jpy, price_usd,
-                discount_price, pricecharting_price, ebay_price, created_at, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('card_name'),
-            data.get('set_name'),
-            data.get('variant'),
-            data.get('psa_grade'),
-            data.get('price_jpy'),
-            data.get('price_usd'),
-            data.get('discount_price'),
-            data.get('pricecharting_price'),
-            data.get('ebay_price'),
-            datetime.now().isoformat(),
-            'camera' if data.get('image') else 'manual'
-        ))
-        conn.commit()
-        card_id = c.lastrowid
-        conn.close()
-
-        return jsonify({'id': card_id, 'message': 'Card saved'})
-
+        data['id'] = len(cards_storage) + 1
+        data['created_at'] = datetime.now().isoformat()
+        cards_storage.append(data)
+        return jsonify({'id': data['id'], 'message': 'Card saved'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -236,17 +174,7 @@ def save_card():
 def get_cards():
     """Retrieve all saved cards"""
     try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('SELECT * FROM cards ORDER BY created_at DESC')
-
-        columns = [desc[0] for desc in c.description]
-        rows = c.fetchall()
-        cards = [dict(zip(columns, row)) for row in rows]
-        conn.close()
-
-        return jsonify(cards)
-
+        return jsonify(cards_storage)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -257,19 +185,11 @@ def export_csv():
         import csv
         from io import StringIO
 
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('SELECT * FROM cards ORDER BY created_at DESC')
-
-        columns = [desc[0] for desc in c.description]
-        rows = c.fetchall()
-        conn.close()
-
-        # Create CSV
         output = StringIO()
-        writer = csv.writer(output)
-        writer.writerow(columns)
-        writer.writerows(rows)
+        if cards_storage:
+            writer = csv.DictWriter(output, fieldnames=cards_storage[0].keys())
+            writer.writeheader()
+            writer.writerows(cards_storage)
 
         return output.getvalue(), 200, {
             'Content-Disposition': 'attachment; filename=pokemon_cards.csv',
@@ -281,5 +201,4 @@ def export_csv():
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
-    debug = os.getenv('ENVIRONMENT') != 'production'
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    app.run(debug=False, host='0.0.0.0', port=port, threaded=True)
