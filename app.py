@@ -75,6 +75,7 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
     """Get price from PriceCharting using Apify scraper"""
     apify_token = os.getenv('APIFY_API_TOKEN')
     if not apify_token:
+        print("No APIFY_API_TOKEN set")
         return None
 
     try:
@@ -82,19 +83,29 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
         search_query = f"{card_name} {set_name} PSA {psa_grade}"
         search_url = f"https://www.pricecharting.com/search-products?type=prices&q={quote(search_query)}&category=trading-cards"
 
+        print(f"Searching PriceCharting for: {search_query}")
+
         run_input = {
             "products": [search_url],
             "proxyConfiguration": {"useApifyProxy": True}
         }
 
         run = client.actor("incognito_mode/pricecharting-product-scraper").call(run_input=run_input)
+        print(f"Apify run completed. Dataset ID: {run['defaultDatasetId']}")
 
-        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        print(f"Found {len(items)} items from Apify")
+
+        for item in items:
+            print(f"Item: {item}")
             if item.get("price"):
-                price_str = str(item["price"]).replace('$', '').strip()
-                return float(price_str)
+                price_str = str(item["price"]).replace('$', '').replace(',', '').strip()
+                try:
+                    return float(price_str)
+                except ValueError:
+                    print(f"Could not parse price: {price_str}")
     except Exception as e:
-        print(f"Apify PriceCharting lookup skipped: {e}")
+        print(f"Apify PriceCharting error: {type(e).__name__}: {e}")
     return None
 
 def get_ebay_price(card_name, set_name, psa_grade):
