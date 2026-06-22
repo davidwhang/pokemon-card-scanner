@@ -111,17 +111,23 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
         page_text = soup.get_text()
 
         if psa_grade:
-            grade_pattern = "PSA\\s*" + str(psa_grade) + "[^$]*\\$?([\\d,]+\\.?\\d*)"
-            match = re.search(grade_pattern, page_text, re.IGNORECASE)
-            if match:
-                price_str = match.group(1).replace(',', '')
-                try:
-                    price = float(price_str)
-                    if 5 < price < 5000:
-                        print(f"  ✓ Found PSA {psa_grade} price: ${price}")
-                        return (price, pricecharting_url)
-                except ValueError:
-                    pass
+            # Look for PSA grade and nearby prices more carefully
+            grade_patterns = [
+                f"PSA\\s*{psa_grade}[^$]*\\$(\\d{{1,4}}(?:,\\d{{3}})*(?:\\.\\d{{2}})?)",  # PSA X $price
+                f"PSA\\s{psa_grade}[^$]*\\$(\\d{{1,4}}(?:,\\d{{3}})*(?:\\.\\d{{2}})?)",   # PSA X $price (less space)
+                f"{psa_grade}\\/10[^$]*\\$(\\d{{1,4}}(?:,\\d{{3}})*(?:\\.\\d{{2}})?)",    # X/10 format
+            ]
+            for pattern in grade_patterns:
+                matches = re.findall(pattern, page_text, re.IGNORECASE)
+                if matches:
+                    for price_str in matches:
+                        try:
+                            price = float(price_str.replace(',', ''))
+                            if 5 < price < 5000:
+                                print(f"  ✓ Found PSA {psa_grade} price: ${price}")
+                                return (price, pricecharting_url)
+                        except ValueError:
+                            pass
 
         prices = re.findall(r'\$([\\d,]+\\.?\\d+)', page_text)
         if prices:
