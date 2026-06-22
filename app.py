@@ -72,41 +72,55 @@ Be precise and only include information you can clearly see. For price_jpy, only
         return None
 
 def get_pricecharting_price(card_name, set_name, psa_grade):
-    """Get price from PriceCharting using Apify scraper"""
+    """Get price from PriceCharting using multiple Apify scrapers"""
     apify_token = os.getenv('APIFY_API_KEY') or os.getenv('APIFY_API_TOKEN')
     if not apify_token:
         print("No APIFY_API_KEY or APIFY_API_TOKEN set")
         return None
 
-    try:
-        client = ApifyClient(apify_token)
-        # Try simple search first (card name + set), then add PSA grade if needed
-        search_query = f"{card_name} {set_name}"
-        search_url = f"https://www.pricecharting.com/search-products?type=prices&q={quote(search_query)}&category=trading-cards"
+    # List of actors to try in order
+    actors_to_try = [
+        "powerai/pricecharting-pokemon-prices-scraper",
+        "ecomscrape/pricecharting-product-details-page-scraper",
+        "ecomscrape/pricecharting-product-collection-price-history-scraper",
+        "lulzasaur/pricecharting-scraper",
+        "incognito_mode/pricecharting-collection-scraper",
+        "incognito_mode/pricecharting-product-scraper",
+    ]
 
-        print(f"Searching PriceCharting for: {search_query}")
+    search_query = f"{card_name} {set_name}"
+    search_url = f"https://www.pricecharting.com/search-products?type=prices&q={quote(search_query)}&category=trading-cards"
 
-        run_input = {
-            "products": [search_url],
-            "proxyConfiguration": {"useApifyProxy": True}
-        }
+    print(f"Searching PriceCharting for: {search_query}")
 
-        run = client.actor("incognito_mode/pricecharting-product-scraper").call(run_input=run_input)
-        print(f"Apify run completed. Dataset ID: {run['defaultDatasetId']}")
+    client = ApifyClient(apify_token)
 
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-        print(f"Found {len(items)} items from Apify")
+    for actor_id in actors_to_try:
+        try:
+            print(f"Trying actor: {actor_id}")
 
-        for item in items:
-            print(f"Item: {item}")
-            if item.get("price"):
-                price_str = str(item["price"]).replace('$', '').replace(',', '').strip()
-                try:
-                    return float(price_str)
-                except ValueError:
-                    print(f"Could not parse price: {price_str}")
-    except Exception as e:
-        print(f"Apify PriceCharting error: {type(e).__name__}: {e}")
+            run_input = {
+                "products": [search_url],
+                "proxyConfiguration": {"useApifyProxy": True}
+            }
+
+            run = client.actor(actor_id).call(run_input=run_input)
+            items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+            print(f"  {actor_id}: Found {len(items)} items")
+
+            for item in items:
+                if item.get("price"):
+                    price_str = str(item["price"]).replace('$', '').replace(',', '').strip()
+                    try:
+                        price = float(price_str)
+                        print(f"  ✓ Success with {actor_id}: ${price}")
+                        return price
+                    except ValueError:
+                        pass
+        except Exception as e:
+            print(f"  {actor_id} failed: {type(e).__name__}")
+
+    print("No price found from any actor")
     return None
 
 def get_ebay_price(card_name, set_name, psa_grade):
