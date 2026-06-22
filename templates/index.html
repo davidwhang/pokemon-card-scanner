@@ -313,7 +313,7 @@
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('camera')">📷 Camera</button>
             <button class="tab-btn" onclick="switchTab('manual')">✏️ Manual</button>
-            <button class="tab-btn" onclick="switchTab('history')">📋 History</button>
+            <button class="tab-btn" onclick="switchTab('history')">💾 SAVED History</button>
         </div>
 
         <!-- CAMERA TAB -->
@@ -365,9 +365,12 @@
                 <label>Price in JPY *</label>
                 <input type="number" id="manualPrice" placeholder="e.g., 5000" step="100">
             </div>
-            <button onclick="analyzeManual()" style="width:100%;">🔍 Get Prices & Save</button>
+            <button onclick="analyzeManual()" style="width:100%; margin-bottom:10px;">🔍 Analyze Card</button>
             <div id="manualResult" style="display:none; margin-top:20px;">
                 <div id="manualResultDisplay"></div>
+                <div class="button-group" id="manualSaveBtn" style="display:none; margin-top:20px;">
+                    <button onclick="saveManualCard()">💾 Save Card</button>
+                </div>
             </div>
         </div>
 
@@ -475,6 +478,7 @@
             document.getElementById('analyzeBtn').style.display = 'none';
             document.getElementById('cameraResult').style.display = 'none';
             document.getElementById('cameraPrice').value = '';
+            startCamera(); // Restart the live camera feed
         }
 
         // Manual input
@@ -519,9 +523,46 @@
                 currentResult = data;
                 displayResult(data, 'manualResult');
                 document.getElementById('manualResult').style.display = 'block';
+                document.getElementById('manualSaveBtn').style.display = 'flex';
             } catch (err) {
                 document.getElementById('manualResult').innerHTML = `<div class="error">Error: ${err.message}</div>`;
                 document.getElementById('manualResult').style.display = 'block';
+                document.getElementById('manualSaveBtn').style.display = 'none';
+            }
+        }
+
+        // Save manual card
+        async function saveManualCard() {
+            if (!currentResult) return;
+
+            try {
+                const response = await fetch('/api/save-card', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentResult)
+                });
+
+                if (!response.ok) throw new Error('Failed to save');
+
+                // Show success message
+                const container = document.getElementById('manualResult');
+                const successMsg = document.createElement('div');
+                successMsg.className = 'success';
+                successMsg.textContent = '✓ Card saved successfully!';
+                container.insertBefore(successMsg, container.firstChild);
+
+                // Clear form
+                setTimeout(() => {
+                    document.getElementById('manualCardName').value = '';
+                    document.getElementById('manualSetName').value = '';
+                    document.getElementById('manualVariant').value = '';
+                    document.getElementById('manualGrade').value = '';
+                    document.getElementById('manualPrice').value = '';
+                    document.getElementById('manualResult').style.display = 'none';
+                    document.getElementById('manualSaveBtn').style.display = 'none';
+                }, 2000);
+            } catch (err) {
+                alert('Error saving card: ' + err.message);
             }
         }
 
