@@ -561,18 +561,14 @@
                         <span class="result-label">With 10% Discount</span>
                         <span class="result-value price-highlight">$${data.discount_price?.toFixed(2) || '—'}</span>
                     </div>
-                    ${data.pricecharting_price ? `
                     <div class="result-field">
                         <span class="result-label">PriceCharting</span>
-                        <span class="result-value">$${data.pricecharting_price.toFixed(2)}</span>
+                        <span class="result-value">${data.pricecharting_price ? `$${data.pricecharting_price.toFixed(2)}` : '—'}</span>
                     </div>
-                    ` : ''}
-                    ${data.ebay_price ? `
                     <div class="result-field">
                         <span class="result-label">eBay Avg</span>
-                        <span class="result-value">$${data.ebay_price.toFixed(2)}</span>
+                        <span class="result-value">${data.ebay_price ? `$${data.ebay_price.toFixed(2)}` : '—'}</span>
                     </div>
-                    ` : ''}
                     ${data.confidence ? `
                     <div class="result-field">
                         <span class="result-label">Confidence</span>
