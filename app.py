@@ -208,9 +208,15 @@ def analyze_card():
         if manual_price:
             card_data['price_jpy'] = float(manual_price)
 
+        # Ensure price_jpy is a number, not a string
         if card_data.get('price_jpy'):
-            card_data['price_usd'] = round(card_data['price_jpy'] / 150, 2)
-            card_data['discount_price'] = round(card_data['price_usd'] * 0.9, 2)
+            try:
+                price_jpy = float(card_data['price_jpy']) if isinstance(card_data['price_jpy'], str) else card_data['price_jpy']
+                card_data['price_jpy'] = price_jpy
+                card_data['price_usd'] = round(price_jpy / 150, 2)
+                card_data['discount_price'] = round(card_data['price_usd'] * 0.9, 2)
+            except (ValueError, TypeError):
+                pass
 
         if card_data.get('psa_grade') and card_data.get('card_name'):
             # Get PriceCharting price and URL
