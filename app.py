@@ -73,11 +73,13 @@ Be precise and only include information you can clearly see. For price_jpy, only
         print(f"Error analyzing image: {e}")
         return None
 
-def get_pricecharting_price(card_name, set_name, psa_grade, variant=None):
-    """Search DuckDuckGo for card on PriceCharting, then scrape the page. Returns (price, url) tuple."""
+def get_pricecharting_price(card_name, set_name, psa_grade, variant=None, card_number=None):
+    """Search DuckDuckGo for card on PriceCharting, then scrape completed auctions. Returns (price, url) tuple."""
     try:
-        # Build search query with card name, set, and variant for specificity
+        # Build search query with card name, set, variant, and card number for specificity
         search_parts = [card_name, set_name]
+        if card_number:
+            search_parts.append(card_number)
         if variant:
             search_parts.append(variant)
         search_parts.append("pricecharting")
@@ -104,21 +106,46 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None):
             print("  No PriceCharting link found")
             return None
 
-        print(f"  Using PriceCharting link: {pricecharting_url}")
+        # Append completed auctions URL fragment to get actual sale data
+        auction_url = pricecharting_url + "#completed-auctions-manual-only"
+        print(f"  Fetching auction data from: {auction_url}")
 
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(pricecharting_url, headers=headers, timeout=5)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content, 'html.parser')
-        page_text = soup.get_text()
 
-        # Always look for PSA 10 price
+        # Look for completed auction prices in table rows
+        auction_prices = []
+
+        # Find all table rows that contain price data
+        rows = soup.find_all('tr')
+        for row in rows:
+            cells = row.find_all('td')
+            if cells:
+                row_text = row.get_text()
+                # Look for prices in the row (find $ amounts)
+                prices_in_row = re.findall(r'\$(\d+(?:,\d{3})*(?:\.\d{2})?)', row_text)
+                for price_str in prices_in_row:
+                    try:
+                        price = float(price_str.replace(',', ''))
+                        # Filter for reasonable PSA 10 prices
+                        if 100 < price < 10000:
+                            auction_prices.append(price)
+                    except ValueError:
+                        pass
+
+        if auction_prices:
+            avg_price = sum(auction_prices) / len(auction_prices)
+            print(f"  ✓ Found {len(auction_prices)} auction sales, average PSA 10 price: ${avg_price:.2f}")
+            return (avg_price, auction_url)
+
+        # Fallback: try to extract the listed PSA 10 price from price table
+        page_text = soup.get_text()
         psa10_patterns = [
-            r"PSA\s*10[^$]*\$(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)",  # PSA 10 $price
-            r"PSA\s10[^$]*\$(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)",   # PSA10 $price
-            r"10/10[^$]*\$(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)",      # 10/10 $price
-            r"Grade\s*10[^$]*\$(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)", # Grade 10 $price
+            r"PSA\s*10[^$]*\$(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)",
+            r"Grade\s*10[^$]*\$(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)",
         ]
 
         for pattern in psa10_patterns:
@@ -127,27 +154,11 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None):
                 for price_str in matches:
                     try:
                         price = float(price_str.replace(',', ''))
-                        if 5 < price < 5000:
-                            print(f"  ✓ Found PSA 10 price: ${price}")
+                        if 100 < price < 10000:
+                            print(f"  ✓ Found listed PSA 10 price: ${price}")
                             return (price, pricecharting_url)
                     except ValueError:
                         pass
-
-        # Fallback: return highest price on page
-        prices = re.findall(r'\$(\d+(?:,\d{3})*(?:\.\d{2})?)', page_text)
-        if prices:
-            valid_prices = []
-            for price_str in prices:
-                try:
-                    price = float(price_str.replace(',', ''))
-                    if 5 < price < 5000:
-                        valid_prices.append(price)
-                except ValueError:
-                    pass
-            if valid_prices:
-                highest_price = max(valid_prices)
-                print(f"  ✓ Found price (highest fallback): ${highest_price}")
-                return (highest_price, pricecharting_url)
 
         return None
 
@@ -210,7 +221,8 @@ def analyze_card():
                 card_data['card_name'],
                 card_data.get('set_name', ''),
                 card_data['psa_grade'],
-                card_data.get('variant', '')
+                card_data.get('variant', ''),
+                card_data.get('card_number', '')
             )
             if isinstance(pricecharting_result, tuple):
                 card_data['pricecharting_price'], card_data['pricecharting_url'] = pricecharting_result
