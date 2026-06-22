@@ -115,29 +115,49 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
         soup = BeautifulSoup(response.content, 'html.parser')
         page_text = soup.get_text()
 
-        # Look for PSA grade prices
+        # Look for PSA grade prices - need to find PSA X followed by price
         if psa_grade:
-            grade_pattern = rf"PSA\s+{psa_grade}.*?\$[\d,.]+"
-            match = re.search(grade_pattern, page_text, re.IGNORECASE)
+            # Look for "PSA {grade}" in the page and find the price after it
+            grade_section = rf"PSA\s*{psa_grade}[^$]*\$?([\d,]+\.?\d*)"
+            match = re.search(grade_section, page_text, re.IGNORECASE)
             if match:
-                price_match = re.search(r'\$([\d,]+\.?\d*)', match.group())
-                if price_match:
-                    price_str = price_match.group(1).replace(',', '')
-                    price = float(price_str)
-                    print(f"  ✓ Found PSA {psa_grade} price: ${price}")
-                    return price
-
-        # Fallback: extract any reasonable price from page
-        prices = re.findall(r'\$([\d,]+\.?\d*)', page_text)
-        if prices:
-            for price_str in prices:
+                price_str = match.group(1).replace(',', '')
                 try:
-                    price = float(price_str.replace(',', ''))
-                    if 5 < price < 5000:  # Reasonable price range for Pokemon cards
-                        print(f"  ✓ Found price: ${price}")
+                    price = float(price_str)
+                    if 5 < price < 5000:
+                        print(f"  ✓ Found PSA {psa_grade} price: ${price}")
                         return price
                 except ValueError:
                     pass
+
+            # Alternative: look for price in table cells near PSA grade
+            all_prices = re.findall(r'PSA\s*' + str(psa_grade) + r'[^$]*\$?([\d,]+\.?\d+)', page_text)
+            if all_prices:
+                for price_str in all_prices:
+                    try:
+                        price = float(price_str.replace(',', ''))
+                        if 5 < price < 5000:
+                            print(f"  ✓ Found PSA {psa_grade} price: ${price}")
+                            return price
+                    except ValueError:
+                        pass
+
+        # Fallback: extract highest reasonable price (usually the PSA 10 price)
+        prices = re.findall(r'\$([\d,]+\.?\d+)', page_text)
+        if prices:
+            valid_prices = []
+            for price_str in prices:
+                try:
+                    price = float(price_str.replace(',', ''))
+                    if 5 < price < 5000:
+                        valid_prices.append(price)
+                except ValueError:
+                    pass
+            if valid_prices:
+                # Return highest price (usually PSA 10)
+                highest_price = max(valid_prices)
+                print(f"  ✓ Found price (highest): ${highest_price}")
+                return highest_price
 
         print("  No price found on page")
         return None
