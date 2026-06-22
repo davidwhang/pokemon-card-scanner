@@ -72,61 +72,64 @@ Be precise and only include information you can clearly see. For price_jpy, only
         return None
 
 def get_pricecharting_price(card_name, set_name, psa_grade):
-    """Get price from PriceCharting using multiple Apify scrapers"""
-    apify_token = os.getenv('APIFY_API_KEY') or os.getenv('APIFY_API_TOKEN')
-    if not apify_token:
-        print("No APIFY_API_KEY or APIFY_API_TOKEN set")
-        return None
+    """Get price from PriceCharting by scraping the card page directly"""
+    try:
+        # Build URL slug from card name (lowercase, replace spaces with hyphens)
+        card_slug = card_name.lower().replace(' ', '-').replace('é', 'e')
 
-    # List of actors to try in order
-    actors_to_try = [
-        "powerai/pricecharting-pokemon-prices-scraper",
-        "ecomscrape/pricecharting-product-details-page-scraper",
-        "ecomscrape/pricecharting-product-collection-price-history-scraper",
-        "lulzasaur/pricecharting-scraper",
-        "incognito_mode/pricecharting-collection-scraper",
-        "incognito_mode/pricecharting-product-scraper",
-    ]
+        # Try direct card page URL
+        pricecharting_urls = [
+            f"https://www.pricecharting.com/game/pokemon-card/{card_slug}",
+            f"https://www.pricecharting.com/product/pokemon-card/{card_slug}",
+        ]
 
-    search_query = f"{card_name} {set_name}"
-    search_url = f"https://www.pricecharting.com/search-products?type=prices&q={quote(search_query)}&category=trading-cards"
+        print(f"Looking up PriceCharting for: {card_name}")
 
-    print(f"Searching PriceCharting for: {search_query}")
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 
-    client = ApifyClient(apify_token)
+        for url in pricecharting_urls:
+            try:
+                response = requests.get(url, headers=headers, timeout=5)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.content, 'html.parser')
 
-    for actor_id in actors_to_try:
-        try:
-            print(f"Trying actor: {actor_id}")
+                    # Look for PSA grade prices in the page
+                    # PriceCharting shows grades like "PSA 10", "PSA 9", etc.
+                    if psa_grade:
+                        # Look for the grade row
+                        grade_text = f"PSA {psa_grade}"
+                        price_cells = soup.find_all('td')
 
-            run_input = {
-                "products": [search_url],
-                "proxyConfiguration": {"useApifyProxy": True}
-            }
+                        for i, cell in enumerate(price_cells):
+                            if grade_text in cell.get_text():
+                                # Price is usually in next cell
+                                if i + 1 < len(price_cells):
+                                    price_text = price_cells[i + 1].get_text(strip=True)
+                                    price_match = re.search(r'\$?([\d,]+\.?\d*)', price_text)
+                                    if price_match:
+                                        price_str = price_match.group(1).replace(',', '')
+                                        price = float(price_str)
+                                        print(f"  ✓ Found PSA {psa_grade} price: ${price}")
+                                        return price
 
-            run = client.actor(actor_id).call(run_input=run_input)
-            items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-            print(f"  {actor_id}: Found {len(items)} items")
+                    # Fallback: look for any price on the page
+                    prices = re.findall(r'\$?([\d,]+\.?\d+)', soup.get_text())
+                    if prices:
+                        for price_str in prices:
+                            try:
+                                price = float(price_str.replace(',', ''))
+                                if 5 < price < 1000:  # Reasonable price range
+                                    print(f"  ✓ Found price: ${price}")
+                                    return price
+                            except ValueError:
+                                pass
+            except requests.RequestException as e:
+                print(f"  URL {url} failed: {e}")
+                continue
 
-            for i, item in enumerate(items[:3]):  # Print first 3 items for debugging
-                print(f"    Item {i}: {item}")
+    except Exception as e:
+        print(f"PriceCharting lookup error: {e}")
 
-            for item in items:
-                # Try different price field names
-                price_value = item.get("price") or item.get("productPrice") or item.get("avgPrice") or item.get("currentPrice") or item.get("averagePrice")
-
-                if price_value:
-                    price_str = str(price_value).replace('$', '').replace(',', '').strip()
-                    try:
-                        price = float(price_str)
-                        print(f"  ✓ Success with {actor_id}: ${price}")
-                        return price
-                    except ValueError:
-                        pass
-        except Exception as e:
-            print(f"  {actor_id} failed: {type(e).__name__}")
-
-    print("No price found from any actor")
     return None
 
 def get_ebay_price(card_name, set_name, psa_grade):
