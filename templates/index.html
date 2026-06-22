@@ -847,6 +847,12 @@
                 }
             });
 
+            // Auto-calculate USD prices if JPY price was edited
+            if (updateData.price_jpy) {
+                updateData.price_usd = Math.round(updateData.price_jpy / 150 * 100) / 100;
+                updateData.discount_price = Math.round(updateData.price_usd * 0.9 * 100) / 100;
+            }
+
             try {
                 if (editingFromResult) {
                     // Update currentResult and refresh display
