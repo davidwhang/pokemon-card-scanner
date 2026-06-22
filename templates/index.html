@@ -432,7 +432,8 @@
                 });
                 document.getElementById('video').srcObject = stream;
             } catch (err) {
-                alert('Camera access denied. Please enable camera permissions.');
+                // Silently fail - user can use Manual tab instead
+                console.log('Camera not available');
             }
         }
 
