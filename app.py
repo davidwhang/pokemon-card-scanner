@@ -118,28 +118,44 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None, card_n
 
         # Look for completed auction prices in table rows
         auction_prices = []
+        auction_data = []
 
-        # Find all table rows that contain price data
+        # Find all table rows that contain price data (skip header rows)
         rows = soup.find_all('tr')
         for row in rows:
             cells = row.find_all('td')
-            if cells:
-                row_text = row.get_text()
-                # Look for prices in the row (find $ amounts)
-                prices_in_row = re.findall(r'\$(\d+(?:,\d{3})*(?:\.\d{2})?)', row_text)
-                for price_str in prices_in_row:
+            if len(cells) >= 2:  # Data rows have multiple cells
+                row_text = row.get_text().strip()
+
+                # Skip header rows and empty rows
+                if not row_text or 'Sale Date' in row_text or 'TW Title' in row_text or 'Price' in row_text:
+                    continue
+
+                # Extract price from the last cell (Price column)
+                price_cell = cells[-1].get_text().strip()
+                price_match = re.search(r'\$(\d+(?:,\d{3})*(?:\.\d{2})?)', price_cell)
+
+                if price_match:
                     try:
-                        price = float(price_str.replace(',', ''))
-                        # Filter for reasonable PSA 10 prices
-                        if 100 < price < 10000:
+                        price = float(price_match.group(1).replace(',', ''))
+                        # Filter for reasonable PSA 10 prices (between $50 and $5000)
+                        if 50 < price < 5000:
                             auction_prices.append(price)
-                    except ValueError:
+                            # Store the title and price for display
+                            title = cells[1].get_text().strip() if len(cells) > 1 else 'Unknown'
+                            auction_data.append({'title': title, 'price': price})
+                    except (ValueError, IndexError):
                         pass
 
         if auction_prices:
             avg_price = sum(auction_prices) / len(auction_prices)
             print(f"  ✓ Found {len(auction_prices)} auction sales, average PSA 10 price: ${avg_price:.2f}")
-            return (avg_price, auction_url)
+            # Return price, URL, and auction data for display
+            return {
+                'price': avg_price,
+                'url': auction_url,
+                'auction_data': auction_data
+            }
 
         # Fallback: try to extract the listed PSA 10 price from price table
         page_text = soup.get_text()
@@ -154,9 +170,13 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None, card_n
                 for price_str in matches:
                     try:
                         price = float(price_str.replace(',', ''))
-                        if 100 < price < 10000:
+                        if 50 < price < 10000:
                             print(f"  ✓ Found listed PSA 10 price: ${price}")
-                            return (price, pricecharting_url)
+                            return {
+                                'price': price,
+                                'url': pricecharting_url,
+                                'auction_data': []
+                            }
                     except ValueError:
                         pass
 
@@ -224,10 +244,10 @@ def analyze_card():
                 card_data.get('variant', ''),
                 card_data.get('card_number', '')
             )
-            if isinstance(pricecharting_result, tuple):
-                card_data['pricecharting_price'], card_data['pricecharting_url'] = pricecharting_result
-            else:
-                card_data['pricecharting_price'] = pricecharting_result
+            if pricecharting_result:
+                card_data['pricecharting_price'] = pricecharting_result.get('price')
+                card_data['pricecharting_url'] = pricecharting_result.get('url')
+                card_data['auction_data'] = pricecharting_result.get('auction_data', [])
 
             ebay = get_ebay_price(
                 card_data['card_name'],
