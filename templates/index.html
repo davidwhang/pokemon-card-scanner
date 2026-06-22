@@ -343,6 +343,7 @@
             </div>
 
             <div id="cameraResultButtons" class="button-group" style="display:none; margin-top:20px;">
+                <button onclick="editCurrentCard()">✏️ Edit</button>
                 <button onclick="saveCurrentCard()">💾 Save Card</button>
                 <button class="secondary" onclick="resetCamera()">← Retake</button>
             </div>
@@ -723,6 +724,43 @@
         }
 
         let editingCardId = null;
+        let editingFromResult = false;
+
+        // Edit current result before saving
+        function editCurrentCard() {
+            if (!currentResult) return;
+
+            editingCardId = null;
+            editingFromResult = true;
+
+            // Build form with editable fields
+            const fieldsToEdit = ['card_name', 'card_number', 'set_name', 'variant', 'psa_grade', 'psa_cert_number', 'price_jpy', 'psa_full_details'];
+            let html = '';
+
+            fieldsToEdit.forEach(field => {
+                const value = currentResult[field] || '';
+                const label = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+                if (field === 'psa_full_details') {
+                    html += `
+                        <div class="input-group">
+                            <label>${label}</label>
+                            <textarea id="edit_${field}" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; font-size:12px; height:100px;">${value}</textarea>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="input-group">
+                            <label>${label}</label>
+                            <input type="text" id="edit_${field}" value="${value}" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                        </div>
+                    `;
+                }
+            });
+
+            document.getElementById('editFormFields').innerHTML = html;
+            document.getElementById('editModal').style.display = 'flex';
+        }
 
         // Edit card - open modal
         async function editCard(cardId) {
@@ -769,35 +807,43 @@
 
         // Save edited card
         async function saveEditCard() {
-            if (!editingCardId) return;
+            const fieldsToEdit = ['card_name', 'card_number', 'set_name', 'variant', 'psa_grade', 'psa_cert_number', 'price_jpy', 'psa_full_details'];
+            const updateData = {};
+
+            fieldsToEdit.forEach(field => {
+                const input = document.getElementById(`edit_${field}`);
+                if (input) {
+                    let value = input.value;
+                    // Convert to number for numeric fields
+                    if ((field === 'psa_grade' || field === 'price_jpy') && value !== '') {
+                        value = parseFloat(value);
+                    }
+                    updateData[field] = value || null;
+                }
+            });
 
             try {
-                const updateData = { id: editingCardId };
-                const fieldsToEdit = ['card_name', 'card_number', 'set_name', 'variant', 'psa_grade', 'psa_cert_number', 'price_jpy', 'psa_full_details'];
+                if (editingFromResult) {
+                    // Update currentResult and refresh display
+                    currentResult = { ...currentResult, ...updateData };
+                    displayResult(currentResult, 'cameraResult');
+                    closeEditModal();
+                    editingFromResult = false;
+                } else if (editingCardId) {
+                    // Update saved card
+                    updateData.id = editingCardId;
+                    const response = await fetch('/api/update-card', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updateData)
+                    });
 
-                fieldsToEdit.forEach(field => {
-                    const input = document.getElementById(`edit_${field}`);
-                    if (input) {
-                        let value = input.value;
-                        // Convert to number for numeric fields
-                        if ((field === 'psa_grade' || field === 'price_jpy') && value !== '') {
-                            value = parseFloat(value);
-                        }
-                        updateData[field] = value || null;
-                    }
-                });
-
-                const response = await fetch('/api/update-card', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updateData)
-                });
-
-                if (!response.ok) throw new Error('Failed to update');
-                closeEditModal();
-                loadCards();
+                    if (!response.ok) throw new Error('Failed to update');
+                    closeEditModal();
+                    loadCards();
+                }
             } catch (err) {
-                alert('Error saving card: ' + err.message);
+                alert('Error saving: ' + err.message);
             }
         }
 
