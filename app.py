@@ -158,8 +158,12 @@ def get_ebay_links(psa_full_details=None, card_name=None, set_name=None, card_nu
     # Prefer PSA full details if available, otherwise build from components
     if psa_full_details:
         # Use PSA full details as search query, add "PSA 10" at the end
-        # Add spaces around special characters and clean up
+        # Remove grade info (GEM MT 10, GEM MINT 10, etc.) - keep only the card details
         search_query = psa_full_details.strip()
+        # Remove grade-related text (lines with "GEM", "MINT", numbers only, etc.)
+        lines = search_query.split('\n')
+        filtered_lines = [line for line in lines if not any(x in line.upper() for x in ['GEM', 'MINT', 'MT'])]
+        search_query = ' '.join(filtered_lines)
         # Replace multiple spaces with single space
         search_query = " ".join(search_query.split())
         # Add space before # if missing
@@ -264,6 +268,36 @@ def get_cards():
     """Retrieve all saved cards"""
     try:
         return jsonify(cards_storage)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/update-card', methods=['POST'])
+def update_card():
+    """Update a saved card"""
+    try:
+        data = request.get_json()
+        card_id = data.get('id')
+
+        # Find and update the card
+        for i, card in enumerate(cards_storage):
+            if card.get('id') == card_id:
+                cards_storage[i] = {**card, **{k: v for k, v in data.items() if k != 'id'}}
+                return jsonify({'id': card_id, 'message': 'Card updated'})
+
+        return jsonify({'error': 'Card not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/delete-card', methods=['POST'])
+def delete_card():
+    """Delete a saved card"""
+    try:
+        data = request.get_json()
+        card_id = data.get('id')
+
+        global cards_storage
+        cards_storage = [card for card in cards_storage if card.get('id') != card_id]
+        return jsonify({'message': 'Card deleted'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
