@@ -10,6 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
 from apify_client import ApifyClient
+from duckduckgo_search import DDGS
 
 app = Flask(__name__)
 CORS(app)
@@ -72,65 +73,64 @@ Be precise and only include information you can clearly see. For price_jpy, only
         return None
 
 def get_pricecharting_price(card_name, set_name, psa_grade):
-    """Get price from PriceCharting by scraping the card page directly"""
+    """Search DuckDuckGo for card on PriceCharting, then scrape the page"""
     try:
-        # Build URL slug from card name (lowercase, replace spaces with hyphens)
-        card_slug = card_name.lower().replace(' ', '-').replace('é', 'e')
+        search_query = f"{card_name} {set_name} pricecharting"
+        print(f"Searching DuckDuckGo for: {search_query}")
 
-        # Try direct card page URL
-        pricecharting_urls = [
-            f"https://www.pricecharting.com/game/pokemon-card/{card_slug}",
-            f"https://www.pricecharting.com/product/pokemon-card/{card_slug}",
-        ]
+        ddgs = DDGS()
+        results = ddgs.text(search_query, max_results=5)
 
-        print(f"Looking up PriceCharting for: {card_name}")
+        # Find first PriceCharting link
+        pricecharting_url = None
+        for result in results:
+            if "pricecharting.com" in result.get("href", ""):
+                pricecharting_url = result["href"]
+                print(f"  Found PriceCharting link: {pricecharting_url}")
+                break
 
+        if not pricecharting_url:
+            print("  No PriceCharting link found in search results")
+            return None
+
+        # Scrape the PriceCharting page
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        response = requests.get(pricecharting_url, headers=headers, timeout=5)
+        response.raise_for_status()
 
-        for url in pricecharting_urls:
-            try:
-                response = requests.get(url, headers=headers, timeout=5)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.content, 'html.parser')
+        soup = BeautifulSoup(response.content, 'html.parser')
+        page_text = soup.get_text()
 
-                    # Look for PSA grade prices in the page
-                    # PriceCharting shows grades like "PSA 10", "PSA 9", etc.
-                    if psa_grade:
-                        # Look for the grade row
-                        grade_text = f"PSA {psa_grade}"
-                        price_cells = soup.find_all('td')
+        # Look for PSA grade prices
+        if psa_grade:
+            grade_pattern = rf"PSA\s+{psa_grade}.*?\$[\d,.]+"
+            match = re.search(grade_pattern, page_text, re.IGNORECASE)
+            if match:
+                price_match = re.search(r'\$([\d,]+\.?\d*)', match.group())
+                if price_match:
+                    price_str = price_match.group(1).replace(',', '')
+                    price = float(price_str)
+                    print(f"  ✓ Found PSA {psa_grade} price: ${price}")
+                    return price
 
-                        for i, cell in enumerate(price_cells):
-                            if grade_text in cell.get_text():
-                                # Price is usually in next cell
-                                if i + 1 < len(price_cells):
-                                    price_text = price_cells[i + 1].get_text(strip=True)
-                                    price_match = re.search(r'\$?([\d,]+\.?\d*)', price_text)
-                                    if price_match:
-                                        price_str = price_match.group(1).replace(',', '')
-                                        price = float(price_str)
-                                        print(f"  ✓ Found PSA {psa_grade} price: ${price}")
-                                        return price
+        # Fallback: extract any reasonable price from page
+        prices = re.findall(r'\$([\d,]+\.?\d*)', page_text)
+        if prices:
+            for price_str in prices:
+                try:
+                    price = float(price_str.replace(',', ''))
+                    if 5 < price < 5000:  # Reasonable price range for Pokemon cards
+                        print(f"  ✓ Found price: ${price}")
+                        return price
+                except ValueError:
+                    pass
 
-                    # Fallback: look for any price on the page
-                    prices = re.findall(r'\$?([\d,]+\.?\d+)', soup.get_text())
-                    if prices:
-                        for price_str in prices:
-                            try:
-                                price = float(price_str.replace(',', ''))
-                                if 5 < price < 1000:  # Reasonable price range
-                                    print(f"  ✓ Found price: ${price}")
-                                    return price
-                            except ValueError:
-                                pass
-            except requests.RequestException as e:
-                print(f"  URL {url} failed: {e}")
-                continue
+        print("  No price found on page")
+        return None
 
     except Exception as e:
-        print(f"PriceCharting lookup error: {e}")
-
-    return None
+        print(f"PriceCharting lookup error: {type(e).__name__}: {e}")
+        return None
 
 def get_ebay_price(card_name, set_name, psa_grade):
     """Get eBay price estimate"""
