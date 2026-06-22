@@ -116,9 +116,10 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None):
         if psa_grade:
             # Look for PSA grade and nearby prices more carefully
             grade_patterns = [
-                f"PSA\\s*{psa_grade}[^$]*\\$(\\d{{1,4}}(?:,\\d{{3}})*(?:\\.\\d{{2}})?)",  # PSA X $price
-                f"PSA\\s{psa_grade}[^$]*\\$(\\d{{1,4}}(?:,\\d{{3}})*(?:\\.\\d{{2}})?)",   # PSA X $price (less space)
-                f"{psa_grade}\\/10[^$]*\\$(\\d{{1,4}}(?:,\\d{{3}})*(?:\\.\\d{{2}})?)",    # X/10 format
+                rf"PSA\s*{psa_grade}[^$]*\$(\d{{1,4}}(?:,\d{{3}})*(?:\.\d{{2}})?)",  # PSA X $price
+                rf"PSA\s{psa_grade}[^$]*\$(\d{{1,4}}(?:,\d{{3}})*(?:\.\d{{2}})?)",   # PSA X $price (less space)
+                rf"Grade\s*{psa_grade}[^$]*\$(\d{{1,4}}(?:,\d{{3}})*(?:\.\d{{2}})?)", # Grade X $price
+                rf"{psa_grade}\/10[^$]*\$(\d{{1,4}}(?:,\d{{3}})*(?:\.\d{{2}})?)",    # X/10 format
             ]
             for pattern in grade_patterns:
                 matches = re.findall(pattern, page_text, re.IGNORECASE)
@@ -132,7 +133,7 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None):
                         except ValueError:
                             pass
 
-        prices = re.findall(r'\$([\\d,]+\\.?\\d+)', page_text)
+        prices = re.findall(r'\$(\d+(?:,\d{3})*(?:\.\d{2})?)', page_text)
         if prices:
             valid_prices = []
             for price_str in prices:
