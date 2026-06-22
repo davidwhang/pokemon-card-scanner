@@ -73,9 +73,9 @@ Be precise and only include information you can clearly see. For price_jpy, only
 
 def get_pricecharting_price(card_name, set_name, psa_grade):
     """Get price from PriceCharting using Apify scraper"""
-    apify_token = os.getenv('APIFY_API_TOKEN')
+    apify_token = os.getenv('APIFY_API_KEY') or os.getenv('APIFY_API_TOKEN')
     if not apify_token:
-        print("No APIFY_API_TOKEN set")
+        print("No APIFY_API_KEY or APIFY_API_TOKEN set")
         return None
 
     try:
