@@ -80,7 +80,8 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
 
     try:
         client = ApifyClient(apify_token)
-        search_query = f"{card_name} {set_name} PSA {psa_grade}"
+        # Try simple search first (card name + set), then add PSA grade if needed
+        search_query = f"{card_name} {set_name}"
         search_url = f"https://www.pricecharting.com/search-products?type=prices&q={quote(search_query)}&category=trading-cards"
 
         print(f"Searching PriceCharting for: {search_query}")
