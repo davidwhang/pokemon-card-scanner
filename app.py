@@ -9,6 +9,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
+from apify_client import ApifyClient
 
 app = Flask(__name__)
 CORS(app)
@@ -77,24 +78,20 @@ def get_pricecharting_price(card_name, set_name, psa_grade):
         return None
 
     try:
+        client = ApifyClient(apify_token)
         search_query = f"{card_name} {set_name} PSA {psa_grade}"
-        actor_id = "power4i~pricecharting-pokemon-prices-scraper"
-        url = f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
+        search_url = f"https://www.pricecharting.com/search-products?type=prices&q={quote(search_query)}&category=trading-cards"
 
-        params = {
-            'token': apify_token,
-            'searchURL': f"https://www.pricecharting.com/search-products?type=prices&q={quote(search_query)}&category=trading-cards",
-            'maxItems': 5
+        run_input = {
+            "products": [search_url],
+            "proxyConfiguration": {"useApifyProxy": True}
         }
 
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+        run = client.actor("incognito_mode/pricecharting-product-scraper").call(run_input=run_input)
 
-        if data and len(data) > 0:
-            price = data[0].get('price')
-            if price:
-                price_str = str(price).replace('$', '').strip()
+        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+            if item.get("price"):
+                price_str = str(item["price"]).replace('$', '').strip()
                 return float(price_str)
     except Exception as e:
         print(f"Apify PriceCharting lookup skipped: {e}")
