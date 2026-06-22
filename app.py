@@ -113,26 +113,27 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None):
         soup = BeautifulSoup(response.content, 'html.parser')
         page_text = soup.get_text()
 
-        if psa_grade:
-            # Look for PSA grade and nearby prices more carefully
-            grade_patterns = [
-                rf"PSA\s*{psa_grade}[^$]*\$(\d{{1,4}}(?:,\d{{3}})*(?:\.\d{{2}})?)",  # PSA X $price
-                rf"PSA\s{psa_grade}[^$]*\$(\d{{1,4}}(?:,\d{{3}})*(?:\.\d{{2}})?)",   # PSA X $price (less space)
-                rf"Grade\s*{psa_grade}[^$]*\$(\d{{1,4}}(?:,\d{{3}})*(?:\.\d{{2}})?)", # Grade X $price
-                rf"{psa_grade}\/10[^$]*\$(\d{{1,4}}(?:,\d{{3}})*(?:\.\d{{2}})?)",    # X/10 format
-            ]
-            for pattern in grade_patterns:
-                matches = re.findall(pattern, page_text, re.IGNORECASE)
-                if matches:
-                    for price_str in matches:
-                        try:
-                            price = float(price_str.replace(',', ''))
-                            if 5 < price < 5000:
-                                print(f"  ✓ Found PSA {psa_grade} price: ${price}")
-                                return (price, pricecharting_url)
-                        except ValueError:
-                            pass
+        # Always look for PSA 10 price
+        psa10_patterns = [
+            r"PSA\s*10[^$]*\$(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)",  # PSA 10 $price
+            r"PSA\s10[^$]*\$(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)",   # PSA10 $price
+            r"10/10[^$]*\$(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)",      # 10/10 $price
+            r"Grade\s*10[^$]*\$(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)", # Grade 10 $price
+        ]
 
+        for pattern in psa10_patterns:
+            matches = re.findall(pattern, page_text, re.IGNORECASE)
+            if matches:
+                for price_str in matches:
+                    try:
+                        price = float(price_str.replace(',', ''))
+                        if 5 < price < 5000:
+                            print(f"  ✓ Found PSA 10 price: ${price}")
+                            return (price, pricecharting_url)
+                    except ValueError:
+                        pass
+
+        # Fallback: return highest price on page
         prices = re.findall(r'\$(\d+(?:,\d{3})*(?:\.\d{2})?)', page_text)
         if prices:
             valid_prices = []
@@ -145,7 +146,7 @@ def get_pricecharting_price(card_name, set_name, psa_grade, variant=None):
                     pass
             if valid_prices:
                 highest_price = max(valid_prices)
-                print(f"  ✓ Found price (highest): ${highest_price}")
+                print(f"  ✓ Found price (highest fallback): ${highest_price}")
                 return (highest_price, pricecharting_url)
 
         return None
